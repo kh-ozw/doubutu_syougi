@@ -11,6 +11,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * bodogeAI
@@ -64,7 +69,7 @@ public class bodogeAI {
                     }
                     System.out.println(boardMap);
 
-                    abResults nextMove = alphabeta1(boardMap, myTurn, yourTurn, 9, -500000, 500000);
+                    abResults nextMove = P_alphabeta1(boardMap, myTurn, yourTurn, 9, -500000, 500000);
 
                     String WorL = winOrLose(boardMap, myTurn);
 
@@ -99,12 +104,8 @@ public class bodogeAI {
     }
 
     // alphabeta method
-    private abResults alphabeta1(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth, int alpha,
-            int beta) {
-        // static evaluation if the edge
-        if (depth == 0) {
-            return new abResults(judge(boardMap, myTurn, depth + 1), "");
-        }
+    private abResults P_alphabeta1(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth,
+            int alpha, int beta) throws InterruptedException, ExecutionException {
 
         // dynamic evaluation if not the edge
         String bestMove = "";
@@ -117,13 +118,18 @@ public class bodogeAI {
         // explore all possible moves
         ArrayList<String> nextMoveList = new ArrayList<String>();
         nextMoveList = Nextmv(boardMap, myTurn, moveList);
-        for (String nextMove : nextMoveList) {
-            HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
-            abResults tempResults = alphabeta2(nextBoard, myTurn, yourTurn, depth - 1, beta, alpha);
+        ExecutorService es = Executors.newFixedThreadPool(8);
+        List<Future<abResults>> tasks = new ArrayList<Future<abResults>>();
+        for (int i = 0; i < nextMoveList.size(); i++) {
+            tasks.add(es.submit(
+                    new ParallelTask(moveList, boardMap, nextMoveList.get(i), myTurn, yourTurn, depth, alpha, beta)));
+        }
+        for (int i = 0; i < nextMoveList.size(); i++) {
+            abResults tempResults = tasks.get(i).get();
             // if evaluated point > alpha, uprade alpha
             if (tempResults.getPoint() > alpha) {
                 alpha = tempResults.getPoint();
-                bestMove = nextMove;
+                bestMove = nextMoveList.get(i);
             }
             // if alpha >= beta, no more looking into possible moves
             if (alpha >= beta) {
@@ -133,114 +139,16 @@ public class bodogeAI {
         return new abResults(alpha, bestMove);
     }
 
-    // alphabeta method
-    private abResults alphabeta2(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth, int alpha,
-            int beta) {
-        // static evaluation if the edge
-        if (depth == 0) {
-            return new abResults(judge(boardMap, myTurn, depth + 1), "");
-        }
-
-        // dynamic evaluation if not the edge
-        String bestMove = "";
-        String WorL = winOrLose(boardMap, myTurn);
-        if (WorL.equals("win")) {
-            return new abResults(10001 + depth, "");
-        } else if (WorL.equals("lose")) {
-            return new abResults(-10001 + depth, "");
-        }
-        // explore all possible moves
-        ArrayList<String> nextMoveList = new ArrayList<String>();
-        nextMoveList = Nextmv(boardMap, yourTurn, moveList);
-        for (String nextMove : nextMoveList) {
-            HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, yourTurn);
-            abResults tempResults = alphabeta1(nextBoard, myTurn, yourTurn, depth - 1, beta, alpha);
-            // if evaluated point < alpha, upgrade alpha
-            if (tempResults.getPoint() < alpha) {
-                alpha = tempResults.getPoint();
-                bestMove = nextMove;
-            }
-            // if alpha <= beta, no more looking into possible moves
-            if (alpha <= beta) {
-                break;
+    private static HashMap<String, String> makeMap(String checkBoard) {
+        HashMap<String, String> boardMap = new HashMap<String, String>();
+        String[] elem = checkBoard.split(",");
+        for (int i = 0; i < elem.length; i++) {
+            elem[i] = elem[i].strip();
+            if (!elem[i].equals("") && !elem[i].split(" ")[1].equals("--")) {
+                boardMap.put(elem[i].split(" ")[0], elem[i].split(" ")[1]);
             }
         }
-        return new abResults(alpha, bestMove);
-    }
-
-    private int judge(HashMap<String, String> boardMap, String myTurn, int depth) {
-        int point = 0;
-        String myHandAlf = "D";
-        String yourHandAlf = "E";
-        if (myTurn.equals("2")) {
-            myHandAlf = "E";
-            yourHandAlf = "D";
-        }
-
-        for (Entry<String, String> entry : boardMap.entrySet()) {
-            String board = entry.getKey();
-            String piece = entry.getValue();
-            String WorL = winOrLose(boardMap, myTurn);
-            if (WorL.equals("win")) {
-                return 100000 + depth;
-            } else if (WorL.equals("lose")) {
-                return -100000 + depth;
-            }
-
-            // score according to the piece. ex "A2 g1"
-            String boardAlf = board.substring(0, 1); // boardAlf = A
-            // String boardNum = board.substring(1, 2); // boardNum = 2
-            String pieceAlf = piece.substring(0, 1); // pieceAlf = g
-            String pieceNum = piece.substring(1, 2); // pieceNum = 1
-
-            if (pieceAlf.equals("c")) {
-                if (pieceNum.equals(myTurn)) {
-                    point += 1;
-                    if (boardAlf.equals(myHandAlf)) {
-                        point += 2;
-                    }
-                } else {
-                    point -= 1;
-                    if (boardAlf.equals(yourHandAlf)) {
-                        point -= 2;
-                    }
-                }
-            }
-            if (pieceAlf.equals("h")) {
-                if (pieceNum.equals(myTurn)) {
-                    point += 10;
-                } else {
-                    point -= 10;
-                }
-            }
-            if (pieceAlf.equals("e")) {
-                if (pieceNum.equals(myTurn)) {
-                    point += 6;
-                    if (boardAlf.equals(myHandAlf)) {
-                        point += 2;
-                    }
-                } else {
-                    point -= 6;
-                    if (boardAlf.equals(yourHandAlf)) {
-                        point -= 2;
-                    }
-                }
-            }
-            if (pieceAlf.equals("g")) {
-                if (pieceNum.equals(myTurn)) {
-                    point += 5;
-                    if (boardAlf.equals(myHandAlf)) {
-                        point += 2;
-                    }
-                } else {
-                    point -= 5;
-                    if (boardAlf.equals(yourHandAlf)) {
-                        point -= 2;
-                    }
-                }
-            }
-        }
-        return point + depth * 100;
+        return boardMap;
     }
 
     private String winOrLose(HashMap<String, String> boardMap, String myTurn) {
@@ -288,6 +196,46 @@ public class bodogeAI {
             return "lose";
         }
         return "";
+    }
+
+    private static ArrayList<String> Nextmv(HashMap<String, String> boardMap, String myTurn,
+            Map<String, List<String>> moveList) {
+        ArrayList<String> nextMoveList = new ArrayList<String>();
+        String OwnPiece = "D";
+        if (myTurn.equals("2")) {
+            OwnPiece = "E";
+        }
+        String pieceFlug = "";
+        // retrieving the board infomation
+        for (Entry<String, String> entry : boardMap.entrySet()) {
+            String board = entry.getKey();
+            String piece = entry.getValue();
+            // when a piece is turn player
+            if (piece.substring(1, 2).equals(myTurn)) {
+                // when a piece in possession
+                if (board.substring(0, 1).equals(OwnPiece)) {
+                    if (!pieceFlug.contains(piece.substring(0, 1))) {
+                        Set<String> subBoardSet = subBoardSet(boardMap.keySet());
+                        for (String b : subBoardSet) {
+                            nextMoveList.add(board + " " + b);
+                        }
+                        pieceFlug += piece.substring(0, 1);
+                    }
+                } else {
+                    // when the board piece
+                    List<String> mvList = moveList.get(board + " " + piece);
+
+                    for (String mv : mvList) {
+                        if (!boardMap.containsKey(mv) || !boardMap.get(mv).substring(1, 2).equals(myTurn)) {
+                            if (!mv.equals("")) {
+                                nextMoveList.add(board + " " + mv);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return nextMoveList;
     }
 
     private HashMap<String, String> makeNextBoard(HashMap<String, String> boardMap0, String nextMove, String turn) {
@@ -450,58 +398,6 @@ public class bodogeAI {
         return boardMap;
     }
 
-    private static HashMap<String, String> makeMap(String checkBoard) {
-        HashMap<String, String> boardMap = new HashMap<String, String>();
-        String[] elem = checkBoard.split(",");
-        for (int i = 0; i < elem.length; i++) {
-            elem[i] = elem[i].strip();
-            if (!elem[i].equals("") && !elem[i].split(" ")[1].equals("--")) {
-                boardMap.put(elem[i].split(" ")[0], elem[i].split(" ")[1]);
-            }
-        }
-        return boardMap;
-    }
-
-    private static ArrayList<String> Nextmv(HashMap<String, String> boardMap, String myTurn,
-            Map<String, List<String>> moveList) {
-        ArrayList<String> nextMoveList = new ArrayList<String>();
-        String OwnPiece = "D";
-        if (myTurn.equals("2")) {
-            OwnPiece = "E";
-        }
-        String pieceFlug = "";
-        // retrieving the board infomation
-        for (Entry<String, String> entry : boardMap.entrySet()) {
-            String board = entry.getKey();
-            String piece = entry.getValue();
-            // when a piece is turn player
-            if (piece.substring(1, 2).equals(myTurn)) {
-                // when a piece in possession
-                if (board.substring(0, 1).equals(OwnPiece)) {
-                    if (!pieceFlug.contains(piece.substring(0, 1))) {
-                        Set<String> subBoardSet = subBoardSet(boardMap.keySet());
-                        for (String b : subBoardSet) {
-                            nextMoveList.add(board + " " + b);
-                        }
-                        pieceFlug += piece.substring(0, 1);
-                    }
-                } else {
-                    // when the board piece
-                    List<String> mvList = moveList.get(board + " " + piece);
-
-                    for (String mv : mvList) {
-                        if (!boardMap.containsKey(mv) || !boardMap.get(mv).substring(1, 2).equals(myTurn)) {
-                            if (!mv.equals("")) {
-                                nextMoveList.add(board + " " + mv);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return nextMoveList;
-    }
-
     private static Set<String> subBoardSet(Set<String> boardKeys) {
         Set<String> allBoard = new HashSet<>();
         allBoard.add("A1");
@@ -522,6 +418,451 @@ public class bodogeAI {
         }
 
         return allBoard;
+    }
+
+    public static class ParallelTask implements Callable<abResults> {
+        private Map<String, List<String>> moveList;
+        private HashMap<String, String> boardMap;
+        private String nextMove;
+        private String myTurn;
+        private String yourTurn;
+        private int depth;
+        private int alpha;
+        private int beta;
+
+        public ParallelTask(Map<String, List<String>> moveList, HashMap<String, String> boardMap, String nextMove,
+                String myTurn, String yourTurn, int depth, int alpha, int beta) {
+            this.moveList = moveList;
+            this.boardMap = boardMap;
+            this.nextMove = nextMove;
+            this.myTurn = myTurn;
+            this.yourTurn = yourTurn;
+            this.depth = depth;
+            this.alpha = alpha;
+            this.beta = beta;
+        }
+
+        @Override
+        public abResults call() throws Exception {
+            HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
+            abResults tempResults = alphabeta2(nextBoard, myTurn, yourTurn, depth - 1, beta, alpha);
+            return tempResults;
+        }
+
+        // alphabeta method
+        private abResults alphabeta1(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth,
+                int alpha, int beta) {
+            // static evaluation if the edge
+            if (depth == 0) {
+                return new abResults(judge(boardMap, myTurn, depth + 1), "");
+            }
+
+            // dynamic evaluation if not the edge
+            String bestMove = "";
+            String WorL = winOrLose(boardMap, myTurn);
+            if (WorL.equals("win")) {
+                return new abResults(10001 + depth, "");
+            } else if (WorL.equals("lose")) {
+                return new abResults(-10001 + depth, "");
+            }
+            // explore all possible moves
+            ArrayList<String> nextMoveList = new ArrayList<String>();
+            nextMoveList = Nextmv(boardMap, myTurn, moveList);
+            for (String nextMove : nextMoveList) {
+                HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
+                abResults tempResults = alphabeta2(nextBoard, myTurn, yourTurn, depth - 1, beta, alpha);
+                // if evaluated point > alpha, uprade alpha
+                if (tempResults.getPoint() > alpha) {
+                    alpha = tempResults.getPoint();
+                    bestMove = nextMove;
+                }
+                // if alpha >= beta, no more looking into possible moves
+                if (alpha >= beta) {
+                    break;
+                }
+            }
+            return new abResults(alpha, bestMove);
+        }
+
+        // alphabeta method
+        private abResults alphabeta2(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth,
+                int alpha, int beta) {
+            // static evaluation if the edge
+            if (depth == 0) {
+                return new abResults(judge(boardMap, myTurn, depth + 1), "");
+            }
+
+            // dynamic evaluation if not the edge
+            String bestMove = "";
+            String WorL = winOrLose(boardMap, myTurn);
+            if (WorL.equals("win")) {
+                return new abResults(10001 + depth, "");
+            } else if (WorL.equals("lose")) {
+                return new abResults(-10001 + depth, "");
+            }
+            // explore all possible moves
+            ArrayList<String> nextMoveList = new ArrayList<String>();
+            nextMoveList = Nextmv(boardMap, yourTurn, moveList);
+            for (String nextMove : nextMoveList) {
+                HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, yourTurn);
+                abResults tempResults = alphabeta1(nextBoard, myTurn, yourTurn, depth - 1, beta, alpha);
+                // if evaluated point < alpha, upgrade alpha
+                if (tempResults.getPoint() < alpha) {
+                    alpha = tempResults.getPoint();
+                    bestMove = nextMove;
+                }
+                // if alpha <= beta, no more looking into possible moves
+                if (alpha <= beta) {
+                    break;
+                }
+            }
+            return new abResults(alpha, bestMove);
+        }
+
+        private int judge(HashMap<String, String> boardMap, String myTurn, int depth) {
+            int point = 0;
+            String myHandAlf = "D";
+            String yourHandAlf = "E";
+            if (myTurn.equals("2")) {
+                myHandAlf = "E";
+                yourHandAlf = "D";
+            }
+
+            for (Entry<String, String> entry : boardMap.entrySet()) {
+                String board = entry.getKey();
+                String piece = entry.getValue();
+                String WorL = winOrLose(boardMap, myTurn);
+                if (WorL.equals("win")) {
+                    return 100000 + depth;
+                } else if (WorL.equals("lose")) {
+                    return -100000 + depth;
+                }
+
+                // score according to the piece. ex "A2 g1"
+                String boardAlf = board.substring(0, 1); // boardAlf = A
+                // String boardNum = board.substring(1, 2); // boardNum = 2
+                String pieceAlf = piece.substring(0, 1); // pieceAlf = g
+                String pieceNum = piece.substring(1, 2); // pieceNum = 1
+
+                if (pieceAlf.equals("c")) {
+                    if (pieceNum.equals(myTurn)) {
+                        point += 1;
+                        if (boardAlf.equals(myHandAlf)) {
+                            point += 2;
+                        }
+                    } else {
+                        point -= 1;
+                        if (boardAlf.equals(yourHandAlf)) {
+                            point -= 2;
+                        }
+                    }
+                }
+                if (pieceAlf.equals("h")) {
+                    if (pieceNum.equals(myTurn)) {
+                        point += 10;
+                    } else {
+                        point -= 10;
+                    }
+                }
+                if (pieceAlf.equals("e")) {
+                    if (pieceNum.equals(myTurn)) {
+                        point += 6;
+                        if (boardAlf.equals(myHandAlf)) {
+                            point += 2;
+                        }
+                    } else {
+                        point -= 6;
+                        if (boardAlf.equals(yourHandAlf)) {
+                            point -= 2;
+                        }
+                    }
+                }
+                if (pieceAlf.equals("g")) {
+                    if (pieceNum.equals(myTurn)) {
+                        point += 5;
+                        if (boardAlf.equals(myHandAlf)) {
+                            point += 2;
+                        }
+                    } else {
+                        point -= 5;
+                        if (boardAlf.equals(yourHandAlf)) {
+                            point -= 2;
+                        }
+                    }
+                }
+            }
+            return point + depth * 100;
+        }
+
+        private String winOrLose(HashMap<String, String> boardMap, String myTurn) {
+            String yourTurn = "2";
+            String winLine = "1";
+            String loseLine = "4";
+            if (myTurn.equals("2")) {
+                yourTurn = "1";
+                winLine = "4";
+                loseLine = "1";
+            }
+
+            // if the lion does not exist
+            if (!boardMap.values().contains("l" + yourTurn)) {
+                return "win";
+            } else if (!boardMap.values().contains("l" + myTurn)) {
+                return "lose";
+            }
+            // our try decision
+            if ((boardMap.containsKey("A" + winLine) && boardMap.get("A" + winLine).equals("l" + myTurn))
+                    || (boardMap.containsKey("B" + winLine) && boardMap.get("B" + winLine).equals("l" + myTurn))
+                    || (boardMap.containsKey("C" + winLine) && boardMap.get("C" + winLine).equals("l" + myTurn))) {
+                ArrayList<String> nextMoveList = new ArrayList<String>();
+                nextMoveList = Nextmv(boardMap, yourTurn, moveList);
+                for (String nextMove : nextMoveList) {
+                    HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, yourTurn);
+                    if (!nextBoard.containsValue("l" + myTurn)) {
+                        return "lose";
+                    }
+                }
+                return "win";
+            }
+            // enemy try decision
+            if ((boardMap.containsKey("A" + loseLine) && boardMap.get("A" + loseLine).equals("l" + yourTurn))
+                    || (boardMap.containsKey("B" + loseLine) && boardMap.get("B" + loseLine).equals("l" + yourTurn))
+                    || (boardMap.containsKey("C" + loseLine) && boardMap.get("C" + loseLine).equals("l" + yourTurn))) {
+                ArrayList<String> nextMoveList = new ArrayList<String>();
+                nextMoveList = Nextmv(boardMap, myTurn, moveList);
+                for (String nextMove : nextMoveList) {
+                    HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
+                    if (!nextBoard.containsValue("l" + yourTurn)) {
+                        return "win";
+                    }
+                }
+                return "lose";
+            }
+            return "";
+        }
+
+        private HashMap<String, String> makeNextBoard(HashMap<String, String> boardMap0, String nextMove, String turn) {
+            HashMap<String, String> boardMap = new HashMap<String, String>(boardMap0);
+            String handAlf = "D";
+            String promLine = "1";
+            if (turn.equals("2")) {
+                handAlf = "E";
+                promLine = "4";
+            }
+            // ex. nextMove = "A1 B2" ===> srcBoard = "A1", dstBoard = "B2"
+            String srcBoard = nextMove.substring(0, 2);
+            String dstBoard = nextMove.substring(3, 5);
+
+            // System.out.print(nextMove + " ");
+            // When a chick evolves
+            if (boardMap.get(srcBoard).equals("c" + new String(turn))) {
+                if (dstBoard.equals("A" + promLine) || dstBoard.equals("B" + promLine)
+                        || dstBoard.equals("C" + promLine)) {
+                    boardMap.replace(srcBoard, "h" + new String(turn));
+                }
+            }
+            // if there are no piece to move to
+            if (!boardMap.containsKey(dstBoard)) {
+
+                boardMap.put(dstBoard, boardMap.get(srcBoard));
+                boardMap.remove(srcBoard);
+
+                // number of piece you pick
+                String pickNum = srcBoard.substring(1, 2);
+                if (srcBoard.substring(0, 1).equals(handAlf)) {
+                    if (!boardMap.containsKey(handAlf + "6")) {
+                        if (!boardMap.containsKey(handAlf + "5")) {
+                            if (!boardMap.containsKey(handAlf + "4")) {
+                                if (!boardMap.containsKey(handAlf + "3")) {
+                                    // if you have 2 piece
+                                    if (boardMap.containsKey(handAlf + "2")) {
+                                        boardMap.put(handAlf + "1", boardMap.get(handAlf + "2"));
+                                    }
+                                } else {
+                                    // if you have 3 piece
+                                    if (pickNum.equals("1")) {
+                                        boardMap.put(handAlf + "1", boardMap.get(handAlf + "2"));
+                                        boardMap.remove(handAlf + "2");
+                                        boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
+                                    } else if (pickNum.equals("2")) {
+                                        boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
+                                    }
+                                    boardMap.remove(handAlf + "3");
+                                }
+                            } else {
+                                // if you have 4 piece
+                                if (pickNum.equals("1")) {
+                                    boardMap.put(handAlf + "1", boardMap.get(handAlf + "2"));
+                                    boardMap.remove(handAlf + "2");
+                                    boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
+                                    boardMap.remove(handAlf + "3");
+                                    boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
+                                } else if (pickNum.equals("2")) {
+                                    boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
+                                    boardMap.remove(handAlf + "3");
+                                    boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
+                                } else if (pickNum.equals("3")) {
+                                    boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
+                                }
+                                boardMap.remove(handAlf + "4");
+                            }
+                        } else {
+                            // if you have 5 piece
+                            if (pickNum.equals("1")) {
+                                boardMap.put(handAlf + "1", boardMap.get(handAlf + "2"));
+                                boardMap.remove(handAlf + "2");
+                                boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
+                                boardMap.remove(handAlf + "3");
+                                boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
+                                boardMap.remove(handAlf + "4");
+                                boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
+                            } else if (pickNum.equals("2")) {
+                                boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
+                                boardMap.remove(handAlf + "3");
+                                boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
+                                boardMap.remove(handAlf + "4");
+                                boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
+                            } else if (pickNum.equals("3")) {
+                                boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
+                                boardMap.remove(handAlf + "4");
+                                boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
+                            } else if (pickNum.equals("4")) {
+                                boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
+                            }
+                            boardMap.remove(handAlf + "5");
+                        }
+                    } else {
+                        // if you have 6 piece
+                        if (pickNum.equals("1")) {
+                            boardMap.put(handAlf + "1", boardMap.get(handAlf + "2"));
+                            boardMap.remove(handAlf + "2");
+                            boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
+                            boardMap.remove(handAlf + "3");
+                            boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
+                            boardMap.remove(handAlf + "4");
+                            boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
+                            boardMap.remove(handAlf + "5");
+                            boardMap.put(handAlf + "5", boardMap.get(handAlf + "6"));
+                        } else if (pickNum.equals("2")) {
+                            boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
+                            boardMap.remove(handAlf + "3");
+                            boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
+                            boardMap.remove(handAlf + "4");
+                            boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
+                            boardMap.remove(handAlf + "5");
+                            boardMap.put(handAlf + "5", boardMap.get(handAlf + "6"));
+                        } else if (pickNum.equals("3")) {
+                            boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
+                            boardMap.remove(handAlf + "4");
+                            boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
+                            boardMap.remove(handAlf + "5");
+                            boardMap.put(handAlf + "5", boardMap.get(handAlf + "6"));
+                        } else if (pickNum.equals("4")) {
+                            boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
+                            boardMap.remove(handAlf + "5");
+                            boardMap.put(handAlf + "5", boardMap.get(handAlf + "6"));
+                        } else if (pickNum.equals("5")) {
+                            boardMap.put(handAlf + "5", boardMap.get(handAlf + "6"));
+                        }
+                        boardMap.remove(handAlf + "6");
+                    }
+                }
+            } else {
+                // if you take a piece
+                String aniName = boardMap.get(dstBoard).substring(0, 1);
+                if (aniName.equals("h")) {
+                    aniName = "c";
+                }
+                boardMap.remove(dstBoard);
+                boardMap.put(dstBoard, boardMap.get(srcBoard));
+                boardMap.remove(srcBoard);
+
+                if (boardMap.containsKey(handAlf + "1")) {
+                    if (boardMap.containsKey(handAlf + "2")) {
+                        if (boardMap.containsKey(handAlf + "3")) {
+                            if (boardMap.containsKey(handAlf + "4")) {
+                                if (boardMap.containsKey(handAlf + "5")) {
+                                    boardMap.put(handAlf + "6", aniName + new String(turn));
+                                } else {
+                                    boardMap.put(handAlf + "5", aniName + new String(turn));
+                                }
+                            } else {
+                                boardMap.put(handAlf + "4", aniName + new String(turn));
+                            }
+                        } else {
+                            boardMap.put(handAlf + "3", aniName + new String(turn));
+                        }
+                    } else {
+                        boardMap.put(handAlf + "2", aniName + new String(turn));
+                    }
+                } else {
+                    boardMap.put(handAlf + "1", aniName + new String(turn));
+                }
+            }
+            return boardMap;
+        }
+
+        private static ArrayList<String> Nextmv(HashMap<String, String> boardMap, String myTurn,
+                Map<String, List<String>> moveList) {
+            ArrayList<String> nextMoveList = new ArrayList<String>();
+            String OwnPiece = "D";
+            if (myTurn.equals("2")) {
+                OwnPiece = "E";
+            }
+            String pieceFlug = "";
+            // retrieving the board infomation
+            for (Entry<String, String> entry : boardMap.entrySet()) {
+                String board = entry.getKey();
+                String piece = entry.getValue();
+                // when a piece is turn player
+                if (piece.substring(1, 2).equals(myTurn)) {
+                    // when a piece in possession
+                    if (board.substring(0, 1).equals(OwnPiece)) {
+                        if (!pieceFlug.contains(piece.substring(0, 1))) {
+                            Set<String> subBoardSet = subBoardSet(boardMap.keySet());
+                            for (String b : subBoardSet) {
+                                nextMoveList.add(board + " " + b);
+                            }
+                            pieceFlug += piece.substring(0, 1);
+                        }
+                    } else {
+                        // when the board piece
+                        List<String> mvList = moveList.get(board + " " + piece);
+
+                        for (String mv : mvList) {
+                            if (!boardMap.containsKey(mv) || !boardMap.get(mv).substring(1, 2).equals(myTurn)) {
+                                if (!mv.equals("")) {
+                                    nextMoveList.add(board + " " + mv);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return nextMoveList;
+        }
+
+        private static Set<String> subBoardSet(Set<String> boardKeys) {
+            Set<String> allBoard = new HashSet<>();
+            allBoard.add("A1");
+            allBoard.add("A2");
+            allBoard.add("A3");
+            allBoard.add("A4");
+            allBoard.add("B1");
+            allBoard.add("B2");
+            allBoard.add("B3");
+            allBoard.add("B4");
+            allBoard.add("C1");
+            allBoard.add("C2");
+            allBoard.add("C3");
+            allBoard.add("C4");
+
+            for (String b : boardKeys) {
+                allBoard.remove(b);
+            }
+
+            return allBoard;
+        }
     }
 
     private static Map<String, List<String>> makemoveList() {
