@@ -64,7 +64,7 @@ public class bodogeAI {
                     }
                     System.out.println(boardMap);
 
-                    abResults nextMove = alphabeta1(boardMap, myTurn, yourTurn, 9, -500000, 500000);
+                    abResults nextMove = negaalpha(boardMap, myTurn, yourTurn, 7, -500000, 500000);
 
                     String WorL = winOrLose(boardMap, myTurn);
 
@@ -99,7 +99,7 @@ public class bodogeAI {
     }
 
     // alphabeta method
-    private abResults alphabeta1(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth, int alpha,
+    private abResults negaalpha(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth, int alpha,
             int beta) {
         // static evaluation if the edge
         if (depth == 0) {
@@ -119,49 +119,14 @@ public class bodogeAI {
         nextMoveList = Nextmv(boardMap, myTurn, moveList);
         for (String nextMove : nextMoveList) {
             HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
-            abResults tempResults = alphabeta2(nextBoard, myTurn, yourTurn, depth - 1, beta, alpha);
+            abResults tempResults = negaalpha(nextBoard, yourTurn, myTurn, depth - 1, -beta, -alpha);
             // if evaluated point > alpha, uprade alpha
-            if (tempResults.getPoint() > alpha) {
-                alpha = tempResults.getPoint();
+            if (-tempResults.getPoint() > alpha) {
+                alpha = -tempResults.getPoint();
                 bestMove = nextMove;
             }
             // if alpha >= beta, no more looking into possible moves
             if (alpha >= beta) {
-                break;
-            }
-        }
-        return new abResults(alpha, bestMove);
-    }
-
-    // alphabeta method
-    private abResults alphabeta2(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth, int alpha,
-            int beta) {
-        // static evaluation if the edge
-        if (depth == 0) {
-            return new abResults(judge(boardMap, myTurn, depth + 1), "");
-        }
-
-        // dynamic evaluation if not the edge
-        String bestMove = "";
-        String WorL = winOrLose(boardMap, myTurn);
-        if (WorL.equals("win")) {
-            return new abResults(10001 + depth, "");
-        } else if (WorL.equals("lose")) {
-            return new abResults(-10001 + depth, "");
-        }
-        // explore all possible moves
-        ArrayList<String> nextMoveList = new ArrayList<String>();
-        nextMoveList = Nextmv(boardMap, yourTurn, moveList);
-        for (String nextMove : nextMoveList) {
-            HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, yourTurn);
-            abResults tempResults = alphabeta1(nextBoard, myTurn, yourTurn, depth - 1, beta, alpha);
-            // if evaluated point < alpha, upgrade alpha
-            if (tempResults.getPoint() < alpha) {
-                alpha = tempResults.getPoint();
-                bestMove = nextMove;
-            }
-            // if alpha <= beta, no more looking into possible moves
-            if (alpha <= beta) {
                 break;
             }
         }
