@@ -98,7 +98,7 @@ public class bodogeAI {
         }
     }
 
-    // alphabeta method
+    // negaalpha method
     private abResults negaalpha(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth, int alpha,
             int beta) {
         // static evaluation if the edge
