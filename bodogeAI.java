@@ -64,7 +64,7 @@ public class bodogeAI {
                     }
                     System.out.println(boardMap);
 
-                    abResults nextMove = alphabeta1(boardMap, myTurn, yourTurn, 9, -500000, 500000);
+                    abResults nextMove = negascout(boardMap, myTurn, myTurn, yourTurn, 5, -500000, 500000);
 
                     String WorL = winOrLose(boardMap, myTurn);
 
@@ -98,8 +98,80 @@ public class bodogeAI {
         }
     }
 
-    // alphabeta method
-    private abResults alphabeta1(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth, int alpha,
+    // negaalpha method
+    private abResults negascout(HashMap<String, String> boardMap, String turn, String myTurn, String yourTurn,
+            int depth, int alpha, int beta) {
+        // static evaluation if the edge
+        if (depth == 0) {
+            int point = judge(boardMap, myTurn, depth + 1);
+            if (turn.equals(yourTurn)) {
+                point = -point;
+            }
+            return new abResults(point, "");
+        }
+
+        // dynamic evaluation if not the edge
+        String bestMove = "";
+        String WorL = winOrLose(boardMap, myTurn);
+        if (WorL.equals("win")) {
+            return new abResults(10001 + depth, "");
+        } else if (WorL.equals("lose")) {
+            return new abResults(-10001 + depth, "");
+        }
+
+        // searching the best move in a shallow move
+        ArrayList<String> orederedMoveList = new ArrayList<String>();
+        ArrayList<String> nextMoveList = Nextmv(boardMap, myTurn, moveList);
+        int maxPoint = -100000;
+        int maxIdx = 0;
+        for (int i = 0; i < nextMoveList.size(); i++) {
+            HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMoveList.get(i), myTurn);
+            abResults shallowResults = negaalpha(nextBoard, myTurn, yourTurn, 3, alpha, beta);
+            if (maxPoint < shallowResults.getPoint()) {
+                maxPoint = shallowResults.getPoint();
+                maxIdx = i;
+            }
+        }
+        Collections.swap(nextMoveList, 0, maxIdx);
+
+        if (turn.equals(myTurn)) {
+            turn = yourTurn;
+        } else if (turn.equals(yourTurn)) {
+            turn = myTurn;
+        }
+
+        // explore first moves (probably the largest value)
+        HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMoveList.get(0), myTurn);
+        abResults tempResults = negascout(nextBoard, turn, yourTurn, myTurn, depth - 1, -beta, -alpha);
+        int score = -tempResults.getPoint();
+        if (score > alpha) {
+            alpha = score;
+            bestMove = nextMoveList.get(0);
+        }
+        alpha = Math.max(alpha, score);
+        // if alpha >= beta, no more looking into possible moves
+        if (alpha < beta) {
+            for (int i = 1; i < nextMoveList.size() - 1; i++) {
+                nextBoard = makeNextBoard(boardMap, nextMoveList.get(i), myTurn);
+                tempResults = negascout(nextBoard, turn, yourTurn, myTurn, depth - 1, -alpha - 1, -alpha);
+                score = -tempResults.getPoint();
+                // if evaluated point > alpha, uprade alpha
+                if (score > alpha) {
+                    alpha = score;
+                    bestMove = nextMoveList.get(i);
+                }
+                alpha = Math.max(alpha, score);
+                // if alpha >= beta, no more looking into possible moves
+                if (alpha >= beta) {
+                    break;
+                }
+            }
+        }
+        return new abResults(alpha, bestMove);
+    }
+
+    // negaalpha method
+    private abResults negaalpha(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth, int alpha,
             int beta) {
         // static evaluation if the edge
         if (depth == 0) {
@@ -119,49 +191,14 @@ public class bodogeAI {
         nextMoveList = Nextmv(boardMap, myTurn, moveList);
         for (String nextMove : nextMoveList) {
             HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
-            abResults tempResults = alphabeta2(nextBoard, myTurn, yourTurn, depth - 1, beta, alpha);
+            abResults tempResults = negaalpha(nextBoard, yourTurn, myTurn, depth - 1, -beta, -alpha);
             // if evaluated point > alpha, uprade alpha
-            if (tempResults.getPoint() > alpha) {
-                alpha = tempResults.getPoint();
+            if (-tempResults.getPoint() > alpha) {
+                alpha = -tempResults.getPoint();
                 bestMove = nextMove;
             }
             // if alpha >= beta, no more looking into possible moves
             if (alpha >= beta) {
-                break;
-            }
-        }
-        return new abResults(alpha, bestMove);
-    }
-
-    // alphabeta method
-    private abResults alphabeta2(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth, int alpha,
-            int beta) {
-        // static evaluation if the edge
-        if (depth == 0) {
-            return new abResults(judge(boardMap, myTurn, depth + 1), "");
-        }
-
-        // dynamic evaluation if not the edge
-        String bestMove = "";
-        String WorL = winOrLose(boardMap, myTurn);
-        if (WorL.equals("win")) {
-            return new abResults(10001 + depth, "");
-        } else if (WorL.equals("lose")) {
-            return new abResults(-10001 + depth, "");
-        }
-        // explore all possible moves
-        ArrayList<String> nextMoveList = new ArrayList<String>();
-        nextMoveList = Nextmv(boardMap, yourTurn, moveList);
-        for (String nextMove : nextMoveList) {
-            HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, yourTurn);
-            abResults tempResults = alphabeta1(nextBoard, myTurn, yourTurn, depth - 1, beta, alpha);
-            // if evaluated point < alpha, upgrade alpha
-            if (tempResults.getPoint() < alpha) {
-                alpha = tempResults.getPoint();
-                bestMove = nextMove;
-            }
-            // if alpha <= beta, no more looking into possible moves
-            if (alpha <= beta) {
                 break;
             }
         }
