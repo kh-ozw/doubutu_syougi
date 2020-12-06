@@ -54,24 +54,27 @@ public class bodogeAI {
             while (true) {
                 writer.println("turn");
                 checkTurn = reader.readLine();
-                System.out.println(checkTurn);
+                // System.out.println(checkTurn);
                 if (checkTurn.substring(6, 7).equals(myTurn)) {
+                    long startTime = System.nanoTime();
                     writer.println("board");
                     checkBoard = reader.readLine();
                     if (!checkBoard.equals("error")) {
-                        System.out.println(checkBoard);
+                        // System.out.println(checkBoard);
                         boardMap = makeMap(checkBoard);
                     }
-                    System.out.println(boardMap);
+                    // System.out.println(boardMap);
 
-                    abResults nextMove = negascout(boardMap, myTurn, myTurn, yourTurn, 5, -500000, 500000);
+                    abResults nextMove = negascout(boardMap, myTurn, yourTurn, 10, -500000, 500000);
 
                     String WorL = winOrLose(boardMap, myTurn);
 
-                    System.out.println("mv  " + nextMove.getBestMove());
+                    System.out.println("mv " + nextMove.getBestMove() + ", point = " + nextMove.getPoint());
                     writer.println("mv " + nextMove.getBestMove());
                     checkMove = reader.readLine();
                     System.out.println(checkMove);
+                    long endTime = System.nanoTime();
+                    System.out.println((endTime - startTime) / 1000000000 + "s");
                     if (WorL.equals("win")) {
                         System.out.println("you win!");
                         break;
@@ -99,14 +102,11 @@ public class bodogeAI {
     }
 
     // negaalpha method
-    private abResults negascout(HashMap<String, String> boardMap, String turn, String myTurn, String yourTurn,
-            int depth, int alpha, int beta) {
+    private abResults negascout(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth, int alpha,
+            int beta) {
         // static evaluation if the edge
         if (depth == 0) {
             int point = judge(boardMap, myTurn, depth + 1);
-            if (turn.equals(yourTurn)) {
-                point = -point;
-            }
             return new abResults(point, "");
         }
 
@@ -120,51 +120,49 @@ public class bodogeAI {
         }
 
         // searching the best move in a shallow move
-        ArrayList<String> orederedMoveList = new ArrayList<String>();
         ArrayList<String> nextMoveList = Nextmv(boardMap, myTurn, moveList);
-        int maxPoint = -100000;
-        int maxIdx = 0;
-        for (int i = 0; i < nextMoveList.size(); i++) {
-            HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMoveList.get(i), myTurn);
-            abResults shallowResults = negaalpha(nextBoard, myTurn, yourTurn, 3, alpha, beta);
-            if (maxPoint < shallowResults.getPoint()) {
-                maxPoint = shallowResults.getPoint();
-                maxIdx = i;
-            }
-        }
-        Collections.swap(nextMoveList, 0, maxIdx);
+        // int maxPoint = -100000;
+        // int maxIdx = 0;
+        // for (int i = 0; i < nextMoveList.size(); i++) {
+        // String nextMove = nextMoveList.get(i);
+        // HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove,
+        // myTurn);
+        // abResults shallowResults = negaalpha(nextBoard, yourTurn, myTurn, 2, alpha,
+        // beta);
+        // if (maxPoint < shallowResults.getPoint()) {
+        // maxPoint = shallowResults.getPoint();
+        // maxIdx = i;
+        // }
+        // }
+        // Collections.swap(nextMoveList, 0, maxIdx);
 
-        if (turn.equals(myTurn)) {
-            turn = yourTurn;
-        } else if (turn.equals(yourTurn)) {
-            turn = myTurn;
-        }
-
-        // explore first moves (probably the largest value)
-        HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMoveList.get(0), myTurn);
-        abResults tempResults = negascout(nextBoard, turn, yourTurn, myTurn, depth - 1, -beta, -alpha);
-        int score = -tempResults.getPoint();
-        if (score > alpha) {
-            alpha = score;
-            bestMove = nextMoveList.get(0);
-        }
-        alpha = Math.max(alpha, score);
         // if alpha >= beta, no more looking into possible moves
-        if (alpha < beta) {
-            for (int i = 1; i < nextMoveList.size() - 1; i++) {
-                nextBoard = makeNextBoard(boardMap, nextMoveList.get(i), myTurn);
-                tempResults = negascout(nextBoard, turn, yourTurn, myTurn, depth - 1, -alpha - 1, -alpha);
+        int score = 0;
+        for (int i = 0; i < nextMoveList.size(); i++) {
+            String nextMove = nextMoveList.get(i);
+            HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
+            if (i == 0) {
+                // explore first moves (probably the largest value)
+                abResults tempResults = negascout(nextBoard, yourTurn, myTurn, depth - 1, -beta, -alpha);
                 score = -tempResults.getPoint();
-                // if evaluated point > alpha, uprade alpha
-                if (score > alpha) {
-                    alpha = score;
-                    bestMove = nextMoveList.get(i);
+            } else {
+                // search with a null window
+                abResults tempResults = negascout(nextBoard, yourTurn, myTurn, depth - 1, -alpha - 1, -alpha);
+                score = -tempResults.getPoint();
+                // if it failed high, do a full re-search
+                if (alpha < score && score < beta) {
+                    tempResults = negascout(nextBoard, yourTurn, myTurn, depth - 1, -beta, -score);
+                    score = -tempResults.getPoint();
                 }
-                alpha = Math.max(alpha, score);
-                // if alpha >= beta, no more looking into possible moves
-                if (alpha >= beta) {
-                    break;
-                }
+            }
+            // if evaluated point > alpha, uprade alpha
+            if (score > alpha) {
+                alpha = score;
+                bestMove = nextMove;
+            }
+            // if alpha >= beta, no more looking into possible moves
+            if (alpha >= beta) {
+                break;
             }
         }
         return new abResults(alpha, bestMove);
@@ -219,9 +217,9 @@ public class bodogeAI {
             String piece = entry.getValue();
             String WorL = winOrLose(boardMap, myTurn);
             if (WorL.equals("win")) {
-                return 100000 + depth;
+                return 10000 + depth;
             } else if (WorL.equals("lose")) {
-                return -100000 + depth;
+                return -10000 + depth;
             }
 
             // score according to the piece. ex "A2 g1"
@@ -305,7 +303,7 @@ public class bodogeAI {
             for (String nextMove : nextMoveList) {
                 HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, yourTurn);
                 if (!nextBoard.containsValue("l" + myTurn)) {
-                    return "lose";
+                    return "";
                 }
             }
             return "win";
@@ -319,7 +317,7 @@ public class bodogeAI {
             for (String nextMove : nextMoveList) {
                 HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
                 if (!nextBoard.containsValue("l" + yourTurn)) {
-                    return "win";
+                    return "";
                 }
             }
             return "lose";
