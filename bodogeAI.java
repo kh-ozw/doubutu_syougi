@@ -17,33 +17,31 @@ import java.util.Map.Entry;
  */
 public class bodogeAI {
     private Map<String, List<String>> moveList;
+    private String MYTURN;
+    private String YOURTURN;
 
-    public bodogeAI(Map<String, List<String>> moveList) {
+    public bodogeAI(Map<String, List<String>> moveList, String MYTURN, String YOURTURN) {
         this.moveList = moveList;
+        this.MYTURN = MYTURN;
+        this.YOURTURN = YOURTURN;
     }
 
     public static void main(String[] args) {
         Map<String, List<String>> moveList = makemoveList();
-        new bodogeAI(moveList).execute();
-    }
-
-    public void execute() {
         String sevName = "localHost";
         int sevPort = 4444;
-
         try {
             Socket socket = new Socket(sevName, sevPort);
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
 
             String firstSend = reader.readLine();
-            // System.out.println(firstSend);
+            System.out.println(firstSend);
             String myTurn = firstSend.substring(14, 15);
             String yourTurn = "2";
             if (myTurn.equals("2")) {
                 yourTurn = "1";
-            } else if (myTurn.equals("1")) {
-            } else {
+            } else if (!myTurn.equals("1")) {
                 System.out.println("Player is full");
                 System.exit(0);
             }
@@ -63,11 +61,11 @@ public class bodogeAI {
                         // System.out.println(checkBoard);
                         boardMap = makeMap(checkBoard);
                     }
-                    // System.out.println(boardMap);
+                    System.out.println(boardMap);
 
-                    abResults nextMove = negascout(boardMap, myTurn, yourTurn, 10, -500000, 500000);
-
-                    String WorL = winOrLose(boardMap, myTurn);
+                    bodogeAI AI = new bodogeAI(moveList, myTurn, yourTurn);
+                    abResults nextMove = AI.execute(boardMap);
+                    String WorL = AI.winOrLose(boardMap, myTurn);
 
                     System.out.println("mv " + nextMove.getBestMove() + ", point = " + nextMove.getPoint());
                     writer.println("mv " + nextMove.getBestMove());
@@ -101,6 +99,25 @@ public class bodogeAI {
         }
     }
 
+    public abResults execute(HashMap<String, String> boardMap) {
+        int havePieceSize = 0;
+        for (Entry<String, String> entry : boardMap.entrySet()) {
+            String board = entry.getKey();
+            if (board.substring(0, 1).equals("D") || board.substring(0, 1).equals("E")) {
+                havePieceSize++;
+            }
+        }
+        System.out.println(havePieceSize);
+        // if (havePieceSize > 5) {
+        // return negascout(boardMap, MYTURN, YOURTURN, 5, -500000, 500000);
+        // } else if (havePieceSize > 3) {
+        // return negascout(boardMap, MYTURN, YOURTURN, 5, -500000, 500000);
+        // } else if (havePieceSize > 2) {
+        // return negascout(boardMap, MYTURN, YOURTURN, 6, -500000, 500000);
+        // }
+        return negascout(boardMap, MYTURN, YOURTURN, 9, -500000, 500000);
+    }
+
     // negaalpha method
     private abResults negascout(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth, int alpha,
             int beta) {
@@ -116,29 +133,30 @@ public class bodogeAI {
         if (WorL.equals("win")) {
             return new abResults(10001 + depth, "");
         } else if (WorL.equals("lose")) {
-            return new abResults(-10001 + depth, "");
+            return new abResults(-10001 - depth, "");
         }
 
         // searching the best move in a shallow move
         ArrayList<String> nextMoveList = Nextmv(boardMap, myTurn, moveList);
-        // int maxPoint = -100000;
-        // int maxIdx = 0;
-        // for (int i = 0; i < nextMoveList.size(); i++) {
-        // String nextMove = nextMoveList.get(i);
-        // HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove,
-        // myTurn);
-        // abResults shallowResults = negaalpha(nextBoard, yourTurn, myTurn, 2, alpha,
-        // beta);
-        // if (maxPoint < shallowResults.getPoint()) {
-        // maxPoint = shallowResults.getPoint();
-        // maxIdx = i;
-        // }
-        // }
-        // Collections.swap(nextMoveList, 0, maxIdx);
+        int maxPoint = -100000;
+        int maxIdx = 0;
+        int s = nextMoveList.size();
+        if (s > 10) {
+            for (int i = 0; i < s; i++) {
+                String nextMove = nextMoveList.get(i);
+                HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
+                abResults shallowResults = new abResults(judge(nextBoard, myTurn, depth + 1), "");
+                if (maxPoint < shallowResults.getPoint()) {
+                    maxPoint = shallowResults.getPoint();
+                    maxIdx = i;
+                }
+            }
+            Collections.swap(nextMoveList, 0, maxIdx);
+        }
 
         // if alpha >= beta, no more looking into possible moves
         int score = 0;
-        for (int i = 0; i < nextMoveList.size(); i++) {
+        for (int i = 0, len = nextMoveList.size(); i < len; i++) {
             String nextMove = nextMoveList.get(i);
             HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
             if (i == 0) {
@@ -182,7 +200,7 @@ public class bodogeAI {
         if (WorL.equals("win")) {
             return new abResults(10001 + depth, "");
         } else if (WorL.equals("lose")) {
-            return new abResults(-10001 + depth, "");
+            return new abResults(-10001 - depth, "");
         }
         // explore all possible moves
         ArrayList<String> nextMoveList = new ArrayList<String>();
@@ -211,16 +229,16 @@ public class bodogeAI {
             myHandAlf = "E";
             yourHandAlf = "D";
         }
+        String WorL = winOrLose(boardMap, myTurn);
+        if (WorL.equals("win")) {
+            return 10000 + depth;
+        } else if (WorL.equals("lose")) {
+            return -10000 - depth;
+        }
 
         for (Entry<String, String> entry : boardMap.entrySet()) {
             String board = entry.getKey();
             String piece = entry.getValue();
-            String WorL = winOrLose(boardMap, myTurn);
-            if (WorL.equals("win")) {
-                return 10000 + depth;
-            } else if (WorL.equals("lose")) {
-                return -10000 + depth;
-            }
 
             // score according to the piece. ex "A2 g1"
             String boardAlf = board.substring(0, 1); // boardAlf = A
@@ -240,15 +258,13 @@ public class bodogeAI {
                         point -= 2;
                     }
                 }
-            }
-            if (pieceAlf.equals("h")) {
+            } else if (pieceAlf.equals("h")) {
                 if (pieceNum.equals(myTurn)) {
-                    point += 10;
+                    point += 6;
                 } else {
-                    point -= 10;
+                    point -= 6;
                 }
-            }
-            if (pieceAlf.equals("e")) {
+            } else if (pieceAlf.equals("e")) {
                 if (pieceNum.equals(myTurn)) {
                     point += 6;
                     if (boardAlf.equals(myHandAlf)) {
@@ -260,8 +276,7 @@ public class bodogeAI {
                         point -= 2;
                     }
                 }
-            }
-            if (pieceAlf.equals("g")) {
+            } else if (pieceAlf.equals("g")) {
                 if (pieceNum.equals(myTurn)) {
                     point += 5;
                     if (boardAlf.equals(myHandAlf)) {
@@ -488,7 +503,7 @@ public class bodogeAI {
     private static HashMap<String, String> makeMap(String checkBoard) {
         HashMap<String, String> boardMap = new HashMap<String, String>();
         String[] elem = checkBoard.split(",");
-        for (int i = 0; i < elem.length; i++) {
+        for (int i = 0, len = elem.length; i < len; i++) {
             elem[i] = elem[i].strip();
             if (!elem[i].equals("") && !elem[i].split(" ")[1].equals("--")) {
                 boardMap.put(elem[i].split(" ")[0], elem[i].split(" ")[1]);
