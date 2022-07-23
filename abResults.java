@@ -1,4 +1,3 @@
-
 public class abResults {
     private int point;
     private String bestMove;

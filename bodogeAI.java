@@ -3,7 +3,6 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,24 +11,43 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
 
+//改善点
+//promLineまとめる
+//475 delete必要？
+//184,,
+//458 手持ちから進化する可能性？
+
 /**
  * bodogeAI
  */
 public class bodogeAI {
     private Map<String, List<String>> moveList;
+    private Map<String, Integer> evaList1;
+    private Map<String, Integer> evaList2;
     private String MYTURN;
     private String YOURTURN;
 
-    public bodogeAI(Map<String, List<String>> moveList, String MYTURN, String YOURTURN) {
+    public bodogeAI(Map<String, List<String>> moveList, Map<String, Integer> evaList1, Map<String, Integer> evaList2,
+            String MYTURN, String YOURTURN) {
         this.moveList = moveList;
+        this.evaList1 = evaList1;
+        this.evaList2 = evaList2;
         this.MYTURN = MYTURN;
         this.YOURTURN = YOURTURN;
     }
 
     public static void main(String[] args) {
-        Map<String, List<String>> moveList = makemoveList();
+        Map<String, List<String>> moveList = makeHashMap.makemoveList();
+        Map<String, Integer> evaList1 = makeHashMap.evaluationList1();
+        Map<String, Integer> evaList2 = makeHashMap.evaluationList2();
         String sevName = "localHost";
         int sevPort = 4444;
+        long testStart = System.nanoTime();
+        long testEnd = System.nanoTime();
+        System.out.println((testEnd - testStart) + "ns");
+        testStart = System.nanoTime();
+        testEnd = System.nanoTime();
+        System.out.println((testEnd - testStart) + "ns");
         try {
             Socket socket = new Socket(sevName, sevPort);
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -41,6 +59,8 @@ public class bodogeAI {
             String yourTurn = "2";
             if (myTurn.equals("2")) {
                 yourTurn = "1";
+                evaList1 = makeHashMap.evaluationList2();
+                evaList2 = makeHashMap.evaluationList1();
             } else if (!myTurn.equals("1")) {
                 System.out.println("Player is full");
                 System.exit(0);
@@ -49,6 +69,7 @@ public class bodogeAI {
 
             String checkTurn, checkBoard, checkMove;
             HashMap<String, String> boardMap = new HashMap<String, String>();
+            bodogeAI AI = new bodogeAI(moveList, evaList1, evaList2, myTurn, yourTurn);
             while (true) {
                 writer.println("turn");
                 checkTurn = reader.readLine();
@@ -61,24 +82,26 @@ public class bodogeAI {
                         // System.out.println(checkBoard);
                         boardMap = makeMap(checkBoard);
                     }
-                    System.out.println(boardMap);
+                    // System.out.println(boardMap);
 
-                    bodogeAI AI = new bodogeAI(moveList, myTurn, yourTurn);
                     abResults nextMove = AI.execute(boardMap);
-                    String WorL = AI.winOrLose(boardMap, myTurn);
+                    Integer WorL = AI.winOrLose(boardMap, myTurn);
 
                     System.out.println("mv " + nextMove.getBestMove() + ", point = " + nextMove.getPoint());
                     writer.println("mv " + nextMove.getBestMove());
                     checkMove = reader.readLine();
-                    System.out.println(checkMove);
                     long endTime = System.nanoTime();
-                    System.out.println((endTime - startTime) / 1000000000 + "s");
-                    if (WorL.equals("win")) {
-                        System.out.println("you win!");
-                        break;
-                    } else if (WorL.equals("lose")) {
-                        System.out.println("you lose!");
-                        break;
+                    System.out.print((endTime - startTime) / 1000000000 + "s ");
+                    System.out.println(checkMove);
+                    if (WorL != null) {
+                        if (WorL == 10000) {
+                            System.out.println("you win!");
+                            break;
+                        } else if (WorL == -10000) {
+                            System.out.println("you lose!");
+                            break;
+                        }
+
                     }
                     if (checkMove.equals("Error.")) {
                         System.exit(0);
@@ -100,14 +123,13 @@ public class bodogeAI {
     }
 
     public abResults execute(HashMap<String, String> boardMap) {
-        int havePieceSize = 0;
-        for (Entry<String, String> entry : boardMap.entrySet()) {
-            String board = entry.getKey();
-            if (board.substring(0, 1).equals("D") || board.substring(0, 1).equals("E")) {
-                havePieceSize++;
-            }
-        }
-        System.out.println(havePieceSize);
+        // int havePieceSize = 0;
+        // for (Entry<String, String> entry : boardMap.entrySet()) {
+        // String board = entry.getKey();
+        // if (board.substring(0, 1).equals("D") || board.substring(0, 1).equals("E")) {
+        // havePieceSize++;
+        // }
+        // }
         // if (havePieceSize > 5) {
         // return negascout(boardMap, MYTURN, YOURTURN, 5, -500000, 500000);
         // } else if (havePieceSize > 3) {
@@ -115,7 +137,7 @@ public class bodogeAI {
         // } else if (havePieceSize > 2) {
         // return negascout(boardMap, MYTURN, YOURTURN, 6, -500000, 500000);
         // }
-        return negascout(boardMap, MYTURN, YOURTURN, 9, -500000, 500000);
+        return negascout(boardMap, MYTURN, YOURTURN, 7, -500000, 500000);
     }
 
     // negaalpha method
@@ -123,18 +145,32 @@ public class bodogeAI {
             int beta) {
         // static evaluation if the edge
         if (depth == 0) {
-            int point = judge(boardMap, myTurn, depth + 1);
+            // int point = judge(boardMap, myTurn);
+            // int point2 = judge2(boardMap, myTurn);
+            // if (point != point2) {
+            // int aa = 0;
+            // }
+            int point = judge2(boardMap, myTurn);
             return new abResults(point, "");
         }
 
         // dynamic evaluation if not the edge
         String bestMove = "";
-        String WorL = winOrLose(boardMap, myTurn);
-        if (WorL.equals("win")) {
-            return new abResults(10001 + depth, "");
-        } else if (WorL.equals("lose")) {
-            return new abResults(-10001 - depth, "");
+        Integer WorL = winOrLose(boardMap, myTurn);
+        if (WorL != null) {
+            if (WorL == 10000) {
+                return new abResults(WorL + depth, "");
+            } else {
+                return new abResults(WorL - depth, "");
+            }
+
         }
+        // String WorL = winOrLose(boardMap, myTurn);
+        // if (WorL.equals("win")) {
+        // return new abResults(10001 + depth, "");
+        // } else if (WorL.equals("lose")) {
+        // return new abResults(-10001 - depth, "");
+        // }
 
         // searching the best move in a shallow move
         ArrayList<String> nextMoveList = Nextmv(boardMap, myTurn, moveList);
@@ -142,10 +178,11 @@ public class bodogeAI {
         int maxIdx = 0;
         int s = nextMoveList.size();
         if (s > 10) {
-            for (int i = 0; i < s; i++) {
+            int i;
+            for (i = 0; i < s; i++) {
                 String nextMove = nextMoveList.get(i);
                 HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
-                abResults shallowResults = new abResults(judge(nextBoard, myTurn, depth + 1), "");
+                abResults shallowResults = new abResults(judge2(nextBoard, myTurn), "");
                 if (maxPoint < shallowResults.getPoint()) {
                     maxPoint = shallowResults.getPoint();
                     maxIdx = i;
@@ -156,7 +193,8 @@ public class bodogeAI {
 
         // if alpha >= beta, no more looking into possible moves
         int score = 0;
-        for (int i = 0, len = nextMoveList.size(); i < len; i++) {
+        int i = 0, len = nextMoveList.size();
+        for (i = 0; i < len; i++) {
             String nextMove = nextMoveList.get(i);
             HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
             if (i == 0) {
@@ -186,42 +224,45 @@ public class bodogeAI {
         return new abResults(alpha, bestMove);
     }
 
-    // negaalpha method
-    private abResults negaalpha(HashMap<String, String> boardMap, String myTurn, String yourTurn, int depth, int alpha,
-            int beta) {
-        // static evaluation if the edge
-        if (depth == 0) {
-            return new abResults(judge(boardMap, myTurn, depth + 1), "");
-        }
+    // // negaalpha method
+    // private abResults negaalpha(HashMap<String, String> boardMap, String myTurn,
+    // String yourTurn, int depth, int alpha,
+    // int beta) {
+    // // static evaluation if the edge
+    // if (depth == 0) {
+    // return new abResults(judge(boardMap, myTurn), "");
+    // }
 
-        // dynamic evaluation if not the edge
-        String bestMove = "";
-        String WorL = winOrLose(boardMap, myTurn);
-        if (WorL.equals("win")) {
-            return new abResults(10001 + depth, "");
-        } else if (WorL.equals("lose")) {
-            return new abResults(-10001 - depth, "");
-        }
-        // explore all possible moves
-        ArrayList<String> nextMoveList = new ArrayList<String>();
-        nextMoveList = Nextmv(boardMap, myTurn, moveList);
-        for (String nextMove : nextMoveList) {
-            HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
-            abResults tempResults = negaalpha(nextBoard, yourTurn, myTurn, depth - 1, -beta, -alpha);
-            // if evaluated point > alpha, uprade alpha
-            if (-tempResults.getPoint() > alpha) {
-                alpha = -tempResults.getPoint();
-                bestMove = nextMove;
-            }
-            // if alpha >= beta, no more looking into possible moves
-            if (alpha >= beta) {
-                break;
-            }
-        }
-        return new abResults(alpha, bestMove);
-    }
+    // // dynamic evaluation if not the edge
+    // String bestMove = "";
+    // String WorL = winOrLose(boardMap, myTurn);
+    // if (WorL.equals("win")) {
+    // return new abResults(10001 + depth, "");
+    // } else if (WorL.equals("lose")) {
+    // return new abResults(-10001 - depth, "");
+    // }
+    // // explore all possible moves
+    // ArrayList<String> nextMoveList = new ArrayList<String>();
+    // nextMoveList = Nextmv(boardMap, myTurn, moveList);
+    // for (String nextMove : nextMoveList) {
+    // HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove,
+    // myTurn);
+    // abResults tempResults = negaalpha(nextBoard, yourTurn, myTurn, depth - 1,
+    // -beta, -alpha);
+    // // if evaluated point > alpha, uprade alpha
+    // if (-tempResults.getPoint() > alpha) {
+    // alpha = -tempResults.getPoint();
+    // bestMove = nextMove;
+    // }
+    // // if alpha >= beta, no more looking into possible moves
+    // if (alpha >= beta) {
+    // break;
+    // }
+    // }
+    // return new abResults(alpha, bestMove);
+    // }
 
-    private int judge(HashMap<String, String> boardMap, String myTurn, int depth) {
+    private int judge(HashMap<String, String> boardMap, String myTurn) {
         int point = 0;
         String myHandAlf = "D";
         String yourHandAlf = "E";
@@ -229,12 +270,16 @@ public class bodogeAI {
             myHandAlf = "E";
             yourHandAlf = "D";
         }
-        String WorL = winOrLose(boardMap, myTurn);
-        if (WorL.equals("win")) {
-            return 10000 + depth;
-        } else if (WorL.equals("lose")) {
-            return -10000 - depth;
+        Integer WorL = winOrLose(boardMap, myTurn);
+        if (WorL != null) {
+            return WorL;
         }
+        // String WorL = winOrLose(boardMap, myTurn);
+        // if (WorL.equals("win")) {
+        // return 10000;
+        // } else if (WorL.equals("lose")) {
+        // return -10000;
+        // }
 
         for (Entry<String, String> entry : boardMap.entrySet()) {
             String board = entry.getKey();
@@ -290,72 +335,128 @@ public class bodogeAI {
                 }
             }
         }
-        return point + depth * 100;
+        return point;
     }
 
-    private String winOrLose(HashMap<String, String> boardMap, String myTurn) {
+    private int judge2(HashMap<String, String> boardMap, String myTurn) {
+        int point = 0;
+        Integer WorL = winOrLose(boardMap, myTurn);
+        if (WorL != null) {
+            return WorL;
+        }
+        // String WorL = winOrLose(boardMap, myTurn);
+        // if (WorL.equals("win")) {
+        // return 10000;
+        // } else if (WorL.equals("lose")) {
+        // return -10000;
+        // }
+        Map<String, Integer> evaList = evaList1;
+        if (!myTurn.equals(MYTURN)) {
+            evaList = evaList2;
+        }
+
+        for (Entry<String, String> entry : boardMap.entrySet()) {
+            String board = entry.getKey();
+            String piece = entry.getValue();
+            point += evaList.get(board + " " + piece);
+        }
+        return point;
+    }
+
+    private Integer winOrLose(HashMap<String, String> boardMap, String myTurn) {
+        // if myTurn = 1
         String yourTurn = "2";
-        String winLine = "1";
-        String loseLine = "4";
+        String myLion = "l1";
+        String yourLion = "l2";
+        String winLineA = "A1";
+        String winLineB = "B1";
+        String winLineC = "C1";
+        String loseLineA = "A4";
+        String loseLineB = "B4";
+        String loseLineC = "C4";
+
+        // if myTurn = 2
         if (myTurn.equals("2")) {
             yourTurn = "1";
-            winLine = "4";
-            loseLine = "1";
+            myLion = "l2";
+            yourLion = "l1";
+            winLineA = "A4";
+            winLineB = "B4";
+            winLineC = "C4";
+            loseLineA = "A1";
+            loseLineB = "B1";
+            loseLineC = "C1";
         }
 
         // if the lion does not exist
-        if (!boardMap.values().contains("l" + yourTurn)) {
-            return "win";
-        } else if (!boardMap.values().contains("l" + myTurn)) {
-            return "lose";
+        if (!boardMap.values().contains(yourLion)) {
+            return 10000;
+        } else if (!boardMap.values().contains(myLion)) {
+            return -10000;
         }
         // our try decision
-        if ((boardMap.containsKey("A" + winLine) && boardMap.get("A" + winLine).equals("l" + myTurn))
-                || (boardMap.containsKey("B" + winLine) && boardMap.get("B" + winLine).equals("l" + myTurn))
-                || (boardMap.containsKey("C" + winLine) && boardMap.get("C" + winLine).equals("l" + myTurn))) {
-            ArrayList<String> nextMoveList = new ArrayList<String>();
-            nextMoveList = Nextmv(boardMap, yourTurn, moveList);
+        if ((boardMap.containsKey(winLineA) && boardMap.get(winLineA).equals(myLion))
+                || (boardMap.containsKey(winLineB) && boardMap.get(winLineB).equals(myLion))
+                || (boardMap.containsKey(winLineC) && boardMap.get(winLineC).equals(myLion))) {
+            ArrayList<String> nextMoveList = Nextmv(boardMap, yourTurn, moveList);
             for (String nextMove : nextMoveList) {
                 HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, yourTurn);
-                if (!nextBoard.containsValue("l" + myTurn)) {
-                    return "";
+                if (!nextBoard.containsValue(myLion)) {
+                    return null;
                 }
             }
-            return "win";
+            return 10000;
         }
         // enemy try decision
-        if ((boardMap.containsKey("A" + loseLine) && boardMap.get("A" + loseLine).equals("l" + yourTurn))
-                || (boardMap.containsKey("B" + loseLine) && boardMap.get("B" + loseLine).equals("l" + yourTurn))
-                || (boardMap.containsKey("C" + loseLine) && boardMap.get("C" + loseLine).equals("l" + yourTurn))) {
-            ArrayList<String> nextMoveList = new ArrayList<String>();
-            nextMoveList = Nextmv(boardMap, myTurn, moveList);
+        if ((boardMap.containsKey(loseLineA) && boardMap.get(loseLineA).equals(yourLion))
+                || (boardMap.containsKey(loseLineB) && boardMap.get(loseLineB).equals(yourLion))
+                || (boardMap.containsKey(loseLineC) && boardMap.get(loseLineC).equals(yourLion))) {
+            ArrayList<String> nextMoveList = Nextmv(boardMap, myTurn, moveList);
             for (String nextMove : nextMoveList) {
                 HashMap<String, String> nextBoard = makeNextBoard(boardMap, nextMove, myTurn);
-                if (!nextBoard.containsValue("l" + yourTurn)) {
-                    return "";
+                if (!nextBoard.containsValue(yourLion)) {
+                    return null;
                 }
             }
-            return "lose";
+            return -10000;
         }
-        return "";
+        return null;
     }
 
     private HashMap<String, String> makeNextBoard(HashMap<String, String> boardMap0, String nextMove, String turn) {
         HashMap<String, String> boardMap = new HashMap<String, String>(boardMap0);
+        // if myTurn = 1
         String handAlf = "D";
-        String promLine = "1";
+        String handAlf1 = "D1";
+        String handAlf2 = "D2";
+        String handAlf3 = "D3";
+        String handAlf4 = "D4";
+        String handAlf5 = "D5";
+        String handAlf6 = "D6";
+        String promLineA = "A1";
+        String promLineB = "B1";
+        String promLineC = "C1";
+        // if myTurn = 2
         if (turn.equals("2")) {
             handAlf = "E";
-            promLine = "4";
+            handAlf1 = "E1";
+            handAlf2 = "E2";
+            handAlf3 = "E3";
+            handAlf4 = "E4";
+            handAlf5 = "E5";
+            handAlf6 = "E6";
+            promLineA = "A4";
+            promLineB = "B4";
+            promLineC = "C4";
         }
-        // ex. nextMove = "A1 B2" ===> srcBoard = "A1", dstBoard = "B2"
+        // ex. (nextMove = "A1 B2") ===> (srcBoard = "A1", dstBoard = "B2")
         String srcBoard = nextMove.substring(0, 2);
         String dstBoard = nextMove.substring(3, 5);
-
         // System.out.print(nextMove + " ");
+
         // When a chick evolves
         if (boardMap.get(srcBoard).equals("c" + new String(turn))) {
-            if (dstBoard.equals("A" + promLine) || dstBoard.equals("B" + promLine) || dstBoard.equals("C" + promLine)) {
+            if (dstBoard.equals(promLineA) || dstBoard.equals(promLineB) || dstBoard.equals(promLineC)) {
                 boardMap.replace(srcBoard, "h" + new String(turn));
             }
         }
@@ -368,101 +469,101 @@ public class bodogeAI {
             // number of piece you pick
             String pickNum = srcBoard.substring(1, 2);
             if (srcBoard.substring(0, 1).equals(handAlf)) {
-                if (!boardMap.containsKey(handAlf + "6")) {
-                    if (!boardMap.containsKey(handAlf + "5")) {
-                        if (!boardMap.containsKey(handAlf + "4")) {
-                            if (!boardMap.containsKey(handAlf + "3")) {
+                if (!boardMap.containsKey(handAlf6)) {
+                    if (!boardMap.containsKey(handAlf5)) {
+                        if (!boardMap.containsKey(handAlf4)) {
+                            if (!boardMap.containsKey(handAlf3)) {
                                 // if you have 2 piece
-                                if (boardMap.containsKey(handAlf + "2")) {
-                                    boardMap.put(handAlf + "1", boardMap.get(handAlf + "2"));
+                                if (boardMap.containsKey(handAlf2)) {
+                                    boardMap.put(handAlf1, boardMap.get(handAlf2));
                                 }
                             } else {
                                 // if you have 3 piece
                                 if (pickNum.equals("1")) {
-                                    boardMap.put(handAlf + "1", boardMap.get(handAlf + "2"));
-                                    boardMap.remove(handAlf + "2");
-                                    boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
+                                    boardMap.put(handAlf1, boardMap.get(handAlf2));
+                                    boardMap.remove(handAlf2);
+                                    boardMap.put(handAlf2, boardMap.get(handAlf3));
                                 } else if (pickNum.equals("2")) {
-                                    boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
+                                    boardMap.put(handAlf2, boardMap.get(handAlf3));
                                 }
-                                boardMap.remove(handAlf + "3");
+                                boardMap.remove(handAlf3);
                             }
                         } else {
                             // if you have 4 piece
                             if (pickNum.equals("1")) {
-                                boardMap.put(handAlf + "1", boardMap.get(handAlf + "2"));
-                                boardMap.remove(handAlf + "2");
-                                boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
-                                boardMap.remove(handAlf + "3");
-                                boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
+                                boardMap.put(handAlf1, boardMap.get(handAlf2));
+                                boardMap.remove(handAlf2);
+                                boardMap.put(handAlf2, boardMap.get(handAlf3));
+                                boardMap.remove(handAlf3);
+                                boardMap.put(handAlf3, boardMap.get(handAlf4));
                             } else if (pickNum.equals("2")) {
-                                boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
-                                boardMap.remove(handAlf + "3");
-                                boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
+                                boardMap.put(handAlf2, boardMap.get(handAlf3));
+                                boardMap.remove(handAlf3);
+                                boardMap.put(handAlf3, boardMap.get(handAlf4));
                             } else if (pickNum.equals("3")) {
-                                boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
+                                boardMap.put(handAlf3, boardMap.get(handAlf4));
                             }
-                            boardMap.remove(handAlf + "4");
+                            boardMap.remove(handAlf4);
                         }
                     } else {
                         // if you have 5 piece
                         if (pickNum.equals("1")) {
-                            boardMap.put(handAlf + "1", boardMap.get(handAlf + "2"));
-                            boardMap.remove(handAlf + "2");
-                            boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
-                            boardMap.remove(handAlf + "3");
-                            boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
-                            boardMap.remove(handAlf + "4");
-                            boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
+                            boardMap.put(handAlf1, boardMap.get(handAlf2));
+                            boardMap.remove(handAlf2);
+                            boardMap.put(handAlf2, boardMap.get(handAlf3));
+                            boardMap.remove(handAlf3);
+                            boardMap.put(handAlf3, boardMap.get(handAlf4));
+                            boardMap.remove(handAlf4);
+                            boardMap.put(handAlf4, boardMap.get(handAlf5));
                         } else if (pickNum.equals("2")) {
-                            boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
-                            boardMap.remove(handAlf + "3");
-                            boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
-                            boardMap.remove(handAlf + "4");
-                            boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
+                            boardMap.put(handAlf2, boardMap.get(handAlf3));
+                            boardMap.remove(handAlf3);
+                            boardMap.put(handAlf3, boardMap.get(handAlf4));
+                            boardMap.remove(handAlf4);
+                            boardMap.put(handAlf4, boardMap.get(handAlf5));
                         } else if (pickNum.equals("3")) {
-                            boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
-                            boardMap.remove(handAlf + "4");
-                            boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
+                            boardMap.put(handAlf3, boardMap.get(handAlf4));
+                            boardMap.remove(handAlf4);
+                            boardMap.put(handAlf4, boardMap.get(handAlf5));
                         } else if (pickNum.equals("4")) {
-                            boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
+                            boardMap.put(handAlf4, boardMap.get(handAlf5));
                         }
-                        boardMap.remove(handAlf + "5");
+                        boardMap.remove(handAlf5);
                     }
                 } else {
                     // if you have 6 piece
                     if (pickNum.equals("1")) {
-                        boardMap.put(handAlf + "1", boardMap.get(handAlf + "2"));
-                        boardMap.remove(handAlf + "2");
-                        boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
-                        boardMap.remove(handAlf + "3");
-                        boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
-                        boardMap.remove(handAlf + "4");
-                        boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
-                        boardMap.remove(handAlf + "5");
-                        boardMap.put(handAlf + "5", boardMap.get(handAlf + "6"));
+                        boardMap.put(handAlf1, boardMap.get(handAlf2));
+                        boardMap.remove(handAlf2);
+                        boardMap.put(handAlf2, boardMap.get(handAlf3));
+                        boardMap.remove(handAlf3);
+                        boardMap.put(handAlf3, boardMap.get(handAlf4));
+                        boardMap.remove(handAlf4);
+                        boardMap.put(handAlf4, boardMap.get(handAlf5));
+                        boardMap.remove(handAlf5);
+                        boardMap.put(handAlf5, boardMap.get(handAlf6));
                     } else if (pickNum.equals("2")) {
-                        boardMap.put(handAlf + "2", boardMap.get(handAlf + "3"));
-                        boardMap.remove(handAlf + "3");
-                        boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
-                        boardMap.remove(handAlf + "4");
-                        boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
-                        boardMap.remove(handAlf + "5");
-                        boardMap.put(handAlf + "5", boardMap.get(handAlf + "6"));
+                        boardMap.put(handAlf2, boardMap.get(handAlf3));
+                        boardMap.remove(handAlf3);
+                        boardMap.put(handAlf3, boardMap.get(handAlf4));
+                        boardMap.remove(handAlf4);
+                        boardMap.put(handAlf4, boardMap.get(handAlf5));
+                        boardMap.remove(handAlf5);
+                        boardMap.put(handAlf5, boardMap.get(handAlf6));
                     } else if (pickNum.equals("3")) {
-                        boardMap.put(handAlf + "3", boardMap.get(handAlf + "4"));
-                        boardMap.remove(handAlf + "4");
-                        boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
-                        boardMap.remove(handAlf + "5");
-                        boardMap.put(handAlf + "5", boardMap.get(handAlf + "6"));
+                        boardMap.put(handAlf3, boardMap.get(handAlf4));
+                        boardMap.remove(handAlf4);
+                        boardMap.put(handAlf4, boardMap.get(handAlf5));
+                        boardMap.remove(handAlf5);
+                        boardMap.put(handAlf5, boardMap.get(handAlf6));
                     } else if (pickNum.equals("4")) {
-                        boardMap.put(handAlf + "4", boardMap.get(handAlf + "5"));
-                        boardMap.remove(handAlf + "5");
-                        boardMap.put(handAlf + "5", boardMap.get(handAlf + "6"));
+                        boardMap.put(handAlf4, boardMap.get(handAlf5));
+                        boardMap.remove(handAlf5);
+                        boardMap.put(handAlf5, boardMap.get(handAlf6));
                     } else if (pickNum.equals("5")) {
-                        boardMap.put(handAlf + "5", boardMap.get(handAlf + "6"));
+                        boardMap.put(handAlf5, boardMap.get(handAlf6));
                     }
-                    boardMap.remove(handAlf + "6");
+                    boardMap.remove(handAlf6);
                 }
             }
         } else {
@@ -475,26 +576,26 @@ public class bodogeAI {
             boardMap.put(dstBoard, boardMap.get(srcBoard));
             boardMap.remove(srcBoard);
 
-            if (boardMap.containsKey(handAlf + "1")) {
-                if (boardMap.containsKey(handAlf + "2")) {
-                    if (boardMap.containsKey(handAlf + "3")) {
-                        if (boardMap.containsKey(handAlf + "4")) {
-                            if (boardMap.containsKey(handAlf + "5")) {
-                                boardMap.put(handAlf + "6", aniName + new String(turn));
+            if (boardMap.containsKey(handAlf1)) {
+                if (boardMap.containsKey(handAlf2)) {
+                    if (boardMap.containsKey(handAlf3)) {
+                        if (boardMap.containsKey(handAlf4)) {
+                            if (boardMap.containsKey(handAlf5)) {
+                                boardMap.put(handAlf6, aniName + new String(turn));
                             } else {
-                                boardMap.put(handAlf + "5", aniName + new String(turn));
+                                boardMap.put(handAlf5, aniName + new String(turn));
                             }
                         } else {
-                            boardMap.put(handAlf + "4", aniName + new String(turn));
+                            boardMap.put(handAlf4, aniName + new String(turn));
                         }
                     } else {
-                        boardMap.put(handAlf + "3", aniName + new String(turn));
+                        boardMap.put(handAlf3, aniName + new String(turn));
                     }
                 } else {
-                    boardMap.put(handAlf + "2", aniName + new String(turn));
+                    boardMap.put(handAlf2, aniName + new String(turn));
                 }
             } else {
-                boardMap.put(handAlf + "1", aniName + new String(turn));
+                boardMap.put(handAlf1, aniName + new String(turn));
             }
         }
         return boardMap;
@@ -503,7 +604,8 @@ public class bodogeAI {
     private static HashMap<String, String> makeMap(String checkBoard) {
         HashMap<String, String> boardMap = new HashMap<String, String>();
         String[] elem = checkBoard.split(",");
-        for (int i = 0, len = elem.length; i < len; i++) {
+        int i = 0, len = elem.length;
+        for (i = 0; i < len; i++) {
             elem[i] = elem[i].strip();
             if (!elem[i].equals("") && !elem[i].split(" ")[1].equals("--")) {
                 boardMap.put(elem[i].split(" ")[0], elem[i].split(" ")[1]);
@@ -574,129 +676,4 @@ public class bodogeAI {
         return allBoard;
     }
 
-    private static Map<String, List<String>> makemoveList() {
-        HashMap<String, List<String>> result = new HashMap<>();
-        result.put("A1 c1", new ArrayList<String>(Arrays.asList("")));
-        result.put("A2 c1", new ArrayList<String>(Arrays.asList("A1")));
-        result.put("A3 c1", new ArrayList<String>(Arrays.asList("A2")));
-        result.put("A4 c1", new ArrayList<String>(Arrays.asList("A3")));
-        result.put("B1 c1", new ArrayList<String>(Arrays.asList("")));
-        result.put("B2 c1", new ArrayList<String>(Arrays.asList("B1")));
-        result.put("B3 c1", new ArrayList<String>(Arrays.asList("B2")));
-        result.put("B4 c1", new ArrayList<String>(Arrays.asList("B3")));
-        result.put("C1 c1", new ArrayList<String>(Arrays.asList("")));
-        result.put("C2 c1", new ArrayList<String>(Arrays.asList("C1")));
-        result.put("C3 c1", new ArrayList<String>(Arrays.asList("C2")));
-        result.put("C4 c1", new ArrayList<String>(Arrays.asList("C3")));
-        result.put("A1 c2", new ArrayList<String>(Arrays.asList("A2")));
-        result.put("A2 c2", new ArrayList<String>(Arrays.asList("A3")));
-        result.put("A3 c2", new ArrayList<String>(Arrays.asList("A4")));
-        result.put("A4 c2", new ArrayList<String>(Arrays.asList("")));
-        result.put("B1 c2", new ArrayList<String>(Arrays.asList("B2")));
-        result.put("B2 c2", new ArrayList<String>(Arrays.asList("B3")));
-        result.put("B3 c2", new ArrayList<String>(Arrays.asList("B4")));
-        result.put("B4 c2", new ArrayList<String>(Arrays.asList("")));
-        result.put("C1 c2", new ArrayList<String>(Arrays.asList("C2")));
-        result.put("C2 c2", new ArrayList<String>(Arrays.asList("C3")));
-        result.put("C3 c2", new ArrayList<String>(Arrays.asList("C4")));
-        result.put("C4 c2", new ArrayList<String>(Arrays.asList("")));
-        result.put("A1 g1", new ArrayList<String>(Arrays.asList("A2", "B1")));
-        result.put("A2 g1", new ArrayList<String>(Arrays.asList("A3", "B2", "A1")));
-        result.put("A3 g1", new ArrayList<String>(Arrays.asList("A4", "B3", "A2")));
-        result.put("A4 g1", new ArrayList<String>(Arrays.asList("B4", "A3")));
-        result.put("B1 g1", new ArrayList<String>(Arrays.asList("B2", "C1", "A1")));
-        result.put("B2 g1", new ArrayList<String>(Arrays.asList("B3", "C2", "A2", "B1")));
-        result.put("B3 g1", new ArrayList<String>(Arrays.asList("B4", "C3", "A3", "B2")));
-        result.put("B4 g1", new ArrayList<String>(Arrays.asList("C4", "A4", "B3")));
-        result.put("C1 g1", new ArrayList<String>(Arrays.asList("C2", "B1")));
-        result.put("C2 g1", new ArrayList<String>(Arrays.asList("C3", "B2", "C1")));
-        result.put("C3 g1", new ArrayList<String>(Arrays.asList("C4", "B3", "C2")));
-        result.put("C4 g1", new ArrayList<String>(Arrays.asList("B4", "C3")));
-        result.put("A1 g2", new ArrayList<String>(Arrays.asList("A2", "B1")));
-        result.put("A2 g2", new ArrayList<String>(Arrays.asList("A3", "B2", "A1")));
-        result.put("A3 g2", new ArrayList<String>(Arrays.asList("A4", "B3", "A2")));
-        result.put("A4 g2", new ArrayList<String>(Arrays.asList("B4", "A3")));
-        result.put("B1 g2", new ArrayList<String>(Arrays.asList("B2", "C1", "A1")));
-        result.put("B2 g2", new ArrayList<String>(Arrays.asList("B3", "C2", "A2", "B1")));
-        result.put("B3 g2", new ArrayList<String>(Arrays.asList("B4", "C3", "A3", "B2")));
-        result.put("B4 g2", new ArrayList<String>(Arrays.asList("C4", "A4", "B3")));
-        result.put("C1 g2", new ArrayList<String>(Arrays.asList("C2", "B1")));
-        result.put("C2 g2", new ArrayList<String>(Arrays.asList("C3", "B2", "C1")));
-        result.put("C3 g2", new ArrayList<String>(Arrays.asList("C4", "B3", "C2")));
-        result.put("C4 g2", new ArrayList<String>(Arrays.asList("B4", "C3")));
-        result.put("A1 e1", new ArrayList<String>(Arrays.asList("B2")));
-        result.put("A2 e1", new ArrayList<String>(Arrays.asList("B3", "B1")));
-        result.put("A3 e1", new ArrayList<String>(Arrays.asList("B4", "B2")));
-        result.put("A4 e1", new ArrayList<String>(Arrays.asList("B3")));
-        result.put("B1 e1", new ArrayList<String>(Arrays.asList("C2", "A2")));
-        result.put("B2 e1", new ArrayList<String>(Arrays.asList("C3", "A3", "A1", "C1")));
-        result.put("B3 e1", new ArrayList<String>(Arrays.asList("C4", "A4", "A2", "C2")));
-        result.put("B4 e1", new ArrayList<String>(Arrays.asList("A3", "C3")));
-        result.put("C1 e1", new ArrayList<String>(Arrays.asList("B2")));
-        result.put("C2 e1", new ArrayList<String>(Arrays.asList("B3", "B1")));
-        result.put("C3 e1", new ArrayList<String>(Arrays.asList("B4", "B2")));
-        result.put("C4 e1", new ArrayList<String>(Arrays.asList("B3")));
-        result.put("A1 e2", new ArrayList<String>(Arrays.asList("B2")));
-        result.put("A2 e2", new ArrayList<String>(Arrays.asList("B3", "B1")));
-        result.put("A3 e2", new ArrayList<String>(Arrays.asList("B4", "B2")));
-        result.put("A4 e2", new ArrayList<String>(Arrays.asList("B3")));
-        result.put("B1 e2", new ArrayList<String>(Arrays.asList("C2", "A2")));
-        result.put("B2 e2", new ArrayList<String>(Arrays.asList("C3", "A3", "A1", "C1")));
-        result.put("B3 e2", new ArrayList<String>(Arrays.asList("C4", "A4", "A2", "C2")));
-        result.put("B4 e2", new ArrayList<String>(Arrays.asList("A3", "C3")));
-        result.put("C1 e2", new ArrayList<String>(Arrays.asList("B2")));
-        result.put("C2 e2", new ArrayList<String>(Arrays.asList("B3", "B1")));
-        result.put("C3 e2", new ArrayList<String>(Arrays.asList("B4", "B2")));
-        result.put("C4 e2", new ArrayList<String>(Arrays.asList("B3")));
-        result.put("A1 h1", new ArrayList<String>(Arrays.asList("A2", "B1")));
-        result.put("A2 h1", new ArrayList<String>(Arrays.asList("A3", "B1", "B2", "A1")));
-        result.put("A3 h1", new ArrayList<String>(Arrays.asList("A4", "B2", "B3", "A2")));
-        result.put("A4 h1", new ArrayList<String>(Arrays.asList("B3", "B4", "A3")));
-        result.put("B1 h1", new ArrayList<String>(Arrays.asList("B2", "C1", "A1")));
-        result.put("B2 h1", new ArrayList<String>(Arrays.asList("B3", "C1", "C2", "A1", "A2", "B1")));
-        result.put("B3 h1", new ArrayList<String>(Arrays.asList("B4", "C2", "C3", "A2", "A3", "B2")));
-        result.put("B4 h1", new ArrayList<String>(Arrays.asList("C3", "C4", "A3", "A4", "B3")));
-        result.put("C1 h1", new ArrayList<String>(Arrays.asList("C2", "B1")));
-        result.put("C2 h1", new ArrayList<String>(Arrays.asList("C3", "B1", "B2", "C1")));
-        result.put("C3 h1", new ArrayList<String>(Arrays.asList("C4", "B2", "B3", "C2")));
-        result.put("C4 h1", new ArrayList<String>(Arrays.asList("B3", "B4", "C3")));
-        result.put("A1 h2", new ArrayList<String>(Arrays.asList("B1", "B2", "A2")));
-        result.put("A2 h2", new ArrayList<String>(Arrays.asList("B2", "B3", "A1", "A3")));
-        result.put("A3 h2", new ArrayList<String>(Arrays.asList("B3", "B4", "A2", "A4")));
-        result.put("A4 h2", new ArrayList<String>(Arrays.asList("B4", "A3")));
-        result.put("B1 h2", new ArrayList<String>(Arrays.asList("C1", "C2", "A2", "A1", "B2")));
-        result.put("B2 h2", new ArrayList<String>(Arrays.asList("C2", "C3", "A3", "A2", "B1", "B3")));
-        result.put("B3 h2", new ArrayList<String>(Arrays.asList("C3", "C4", "A4", "A3", "B2", "B4")));
-        result.put("B4 h2", new ArrayList<String>(Arrays.asList("C4", "A4", "B3")));
-        result.put("C1 h2", new ArrayList<String>(Arrays.asList("B2", "B1", "C2")));
-        result.put("C2 h2", new ArrayList<String>(Arrays.asList("B3", "B2", "C1", "C3")));
-        result.put("C3 h2", new ArrayList<String>(Arrays.asList("B4", "B3", "C2", "C4")));
-        result.put("C4 h2", new ArrayList<String>(Arrays.asList("B4", "C3")));
-        result.put("A1 l1", new ArrayList<String>(Arrays.asList("B1", "B2", "A2")));
-        result.put("A2 l1", new ArrayList<String>(Arrays.asList("A1", "B1", "B2", "B3", "A3")));
-        result.put("A3 l1", new ArrayList<String>(Arrays.asList("A2", "B2", "B3", "B4", "A4")));
-        result.put("A4 l1", new ArrayList<String>(Arrays.asList("A3", "B3", "B4")));
-        result.put("B1 l1", new ArrayList<String>(Arrays.asList("C1", "A1", "C2", "A2", "B2")));
-        result.put("B2 l1", new ArrayList<String>(Arrays.asList("B1", "C1", "A1", "C2", "A2", "C3", "A3", "B3")));
-        result.put("B3 l1", new ArrayList<String>(Arrays.asList("B2", "C2", "A2", "C3", "A3", "C4", "A4", "B4")));
-        result.put("B4 l1", new ArrayList<String>(Arrays.asList("B3", "C3", "A3", "C4", "A4")));
-        result.put("C1 l1", new ArrayList<String>(Arrays.asList("B1", "B2", "C2")));
-        result.put("C2 l1", new ArrayList<String>(Arrays.asList("C1", "B1", "B2", "B3", "C3")));
-        result.put("C3 l1", new ArrayList<String>(Arrays.asList("C2", "B2", "B3", "B4", "C4")));
-        result.put("C4 l1", new ArrayList<String>(Arrays.asList("C3", "B3", "B4")));
-        result.put("A1 l2", new ArrayList<String>(Arrays.asList("B1", "B2", "A2")));
-        result.put("A2 l2", new ArrayList<String>(Arrays.asList("A1", "B1", "B2", "B3", "A3")));
-        result.put("A3 l2", new ArrayList<String>(Arrays.asList("A2", "B2", "B3", "B4", "A4")));
-        result.put("A4 l2", new ArrayList<String>(Arrays.asList("A3", "B3", "B4")));
-        result.put("B1 l2", new ArrayList<String>(Arrays.asList("C1", "A1", "C2", "A2", "B2")));
-        result.put("B2 l2", new ArrayList<String>(Arrays.asList("B1", "C1", "A1", "C2", "A2", "C3", "A3", "B3")));
-        result.put("B3 l2", new ArrayList<String>(Arrays.asList("B2", "C2", "A2", "C3", "A3", "C4", "A4", "B4")));
-        result.put("B4 l2", new ArrayList<String>(Arrays.asList("B3", "C3", "A3", "C4", "A4")));
-        result.put("C1 l2", new ArrayList<String>(Arrays.asList("B1", "B2", "C2")));
-        result.put("C2 l2", new ArrayList<String>(Arrays.asList("C1", "B1", "B2", "B3", "C3")));
-        result.put("C3 l2", new ArrayList<String>(Arrays.asList("C2", "B2", "B3", "B4", "C4")));
-        result.put("C4 l2", new ArrayList<String>(Arrays.asList("C3", "B3", "B4")));
-
-        return Collections.unmodifiableMap(result);
-    }
 }
